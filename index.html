@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>로보카 컨트롤</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --card: #ffffff;
+    --text: #1e1b2e;
+    --muted: #6b6880;
+    --line: #ece8f6;
+    --soft: #f8f5ff;
+    --blue: #7c3aed;       /* 메인 보라 */
+    --blue-dark: #6d28d9;
+    --blue-soft: #f3edff;
+    --red: #ef4444;
+    --red-soft: #fff1f1;
+    --green: #10b981;
+    --shadow: 0 1px 2px rgba(76, 29, 149, 0.04), 0 10px 30px rgba(76, 29, 149, 0.07);
+    --ring: rgba(124, 58, 237, 0.18);
+    --hover-line: #d9c8fb;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    background:
+      radial-gradient(700px 380px at 0% -80px, rgba(167, 139, 250, 0.20), transparent 70%),
+      radial-gradient(700px 380px at 100% -80px, rgba(196, 181, 253, 0.18), transparent 70%),
+      var(--bg);
+    color: var(--text);
+    font-family: "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+    padding: 28px 16px 40px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+  }
+
+  /* ---------- 헤더 ---------- */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap; margin-bottom: 20px;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo {
+    width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center;
+    background: linear-gradient(135deg, #a78bfa, #7c3aed);
+    box-shadow: 0 6px 16px rgba(124, 58, 237, 0.3);
+  }
+  .brand h1 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.4px; }
+  .brand p { margin: 2px 0 0; font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: 1.8px; }
+  .pills { display: flex; gap: 8px; }
+  .pill {
+    display: flex; align-items: center; gap: 7px; padding: 7px 13px;
+    border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--muted);
+    background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow);
+  }
+  .pill i { width: 8px; height: 8px; border-radius: 50%; background: #cbd5e1; transition: background .3s, box-shadow .3s; }
+  .pill.on { color: var(--text); }
+  .pill.on i { background: var(--green); box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.18); }
+
+  /* ---------- 연결 바 (시리얼 / Wi-Fi 가로 배치) ---------- */
+  .connbar {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    padding: 12px; margin-bottom: 18px;
+  }
+  @media (max-width: 720px) { .connbar { grid-template-columns: 1fr; } }
+  .conn {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 12px; border-radius: 14px; background: var(--soft);
+  }
+  .conn-label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 14px; font-weight: 700; color: var(--text); white-space: nowrap;
+  }
+  .conn-label svg { color: var(--blue); }
+  .conn-ctrl { display: flex; gap: 8px; flex: 1 1 200px; min-width: 0; }
+  .conn .status { width: 100%; font-size: 12px; color: var(--muted); }
+  .conn .status b { font-weight: 600; }
+  .conn .status b.on { color: var(--green); }
+
+  select, input {
+    font: inherit; font-size: 14px; color: var(--text);
+    background: #fff; border: 1px solid var(--line); border-radius: 10px;
+    padding: 9px 11px; min-width: 0; outline: none;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  select:focus, input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px var(--ring); }
+  input { flex: 1; font-family: Consolas, monospace; }
+  input:disabled, select:disabled { background: #f8fafc; color: var(--muted); }
+
+  .btn {
+    flex: 1; padding: 9px 16px; cursor: pointer; white-space: nowrap;
+    font: inherit; font-size: 14px; font-weight: 700; color: #fff;
+    background: linear-gradient(135deg, #8b5cf6, var(--blue)); border: 0; border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.28);
+    transition: background .2s, transform .08s, box-shadow .2s;
+  }
+  .btn:hover { background: var(--blue-dark); }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: .6; cursor: wait; }
+  #wifiBtn { flex: 0 0 auto; }
+  .btn.connected { background: #fff; color: var(--text); box-shadow: inset 0 0 0 1px var(--line); }
+  .btn.connected:hover { color: var(--red); box-shadow: inset 0 0 0 1px #fecaca; background: var(--red-soft); }
+
+  /* ---------- 메인 ---------- */
+  .main { display: grid; gap: 18px; grid-template-columns: 1fr; margin-bottom: 18px; }
+  @media (min-width: 860px) { .main { grid-template-columns: 1.25fr 0.75fr; } }
+
+  /* ---------- 로보카 무대 (위에서 본 SVG 로보카) ---------- */
+  .stage {
+    position: relative; overflow: hidden; min-height: 360px;
+    background-color: #fcfaff;
+    background-image:
+      linear-gradient(rgba(124, 58, 237, 0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124, 58, 237, 0.07) 1px, transparent 1px);
+    background-size: 36px 36px;
+    animation: floor 0.5s linear infinite paused;
+  }
+  .stage::after { /* 가장자리를 흰색으로 부드럽게 */
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(circle at 50% 50%, transparent 38%, rgba(255, 255, 255, 0.92) 100%);
+  }
+  @keyframes floor { to { background-position: 0 36px, 0 36px; } }
+  .stage[data-m="F"] { animation-play-state: running; }
+  .stage[data-m="B"] { animation-play-state: running; animation-direction: reverse; }
+
+  .car-wrap {
+    position: absolute; left: 50%; top: 50%; width: 200px; z-index: 1;
+    transform: translate(-50%, -50%) rotate(0deg);
+    transition: transform 0.45s cubic-bezier(.3, 1.4, .5, 1);
+  }
+  .stage[data-m="L"] .car-wrap { transform: translate(-50%, -50%) rotate(-24deg); }
+  .stage[data-m="R"] .car-wrap { transform: translate(-50%, -50%) rotate(24deg); }
+  .car { width: 100%; display: block; overflow: visible; animation: hover 3s ease-in-out infinite; }
+  .stage:not([data-m="S"]) .car { animation: rumble 0.12s linear infinite; }
+  @keyframes hover { 50% { transform: translateY(-4px); } }
+  @keyframes rumble { 50% { transform: translate(0.6px, -0.6px); } }
+
+  .tread { animation: roll 0.28s linear infinite paused; }
+  @keyframes roll { to { transform: translateY(-8px); } }
+  .stage[data-m="F"] .tread { animation-play-state: running; }
+  .stage[data-m="B"] .tread { animation-play-state: running; animation-direction: reverse; }
+  .stage[data-m="L"] .tread { animation-play-state: running; }
+  .stage[data-m="L"] .tread.left { animation-direction: reverse; }
+  .stage[data-m="R"] .tread { animation-play-state: running; }
+  .stage[data-m="R"] .tread.right { animation-direction: reverse; }
+
+  .beam { opacity: 0; transition: opacity 0.3s; }
+  .stage[data-m="F"] .beam, .stage[data-m="L"] .beam, .stage[data-m="R"] .beam { opacity: 1; }
+  .head { fill: #e5e7eb; transition: fill 0.3s; }
+  .stage:not([data-m="S"]) .head { fill: #facc15; filter: url(#glow); }
+  .tail { fill: #fca5a5; transition: fill 0.3s; }
+  .stage.live[data-m="S"] .tail { fill: var(--red); filter: url(#glow); }
+  .stage[data-m="B"] .tail { fill: #ffffff; filter: url(#glow); }
+  .led { fill: #34d399; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { fill: #14532d; } }
+
+  .readout {
+    position: absolute; top: 16px; left: 16px; z-index: 2;
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 14px; border-radius: 999px;
+    font-size: 14px; font-weight: 700; color: var(--muted);
+    background: rgba(255, 255, 255, 0.9); border: 1px solid var(--line); box-shadow: var(--shadow);
+  }
+  .readout::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #cbd5e1; }
+  .stage.live .readout { color: var(--text); }
+  .stage.live .readout::before { background: var(--blue); }
+  .stage.live[data-m="S"] .readout::before { background: var(--red); }
+
+  /* ---------- 조작 패드 ---------- */
+  .control { padding: 22px; display: flex; flex-direction: column; justify-content: center; }
+  .control h2 { margin: 0 0 16px; font-size: 15px; font-weight: 700; color: var(--muted); text-align: center; }
+  .pad {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    grid-template-areas: ". f ." "l s r" ". b .";
+    gap: 10px; width: 100%; max-width: 290px; margin: 0 auto;
+  }
+  .pad button {
+    aspect-ratio: 1; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+    font: inherit; font-size: 13px; font-weight: 700; color: var(--text);
+    background: #fff; border: 1px solid var(--line); border-radius: 18px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 4px 12px rgba(15, 23, 42, 0.06);
+    transition: transform .08s, background .2s, color .2s, border-color .2s, box-shadow .2s;
+    touch-action: manipulation; user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  .pad button svg { width: 26px; height: 26px; color: var(--blue); transition: color .2s; }
+  .pad button:hover:not(:disabled) { border-color: var(--hover-line); background: var(--blue-soft); }
+  .pad button:active:not(:disabled) { transform: scale(0.95); }
+  .pad button.active {
+    background: linear-gradient(135deg, #8b5cf6, var(--blue)); color: #fff; border-color: var(--blue);
+    box-shadow: 0 8px 20px rgba(124, 58, 237, 0.35);
+  }
+  .pad button.active svg { color: #fff; }
+  .pad button:disabled { cursor: not-allowed; color: #bdb6d1; background: #faf9fd; box-shadow: none; }
+  .pad button:disabled svg { color: #d4cbe8; }
+  #btnF { grid-area: f; } #btnB { grid-area: b; }
+  #btnL { grid-area: l; } #btnR { grid-area: r; }
+  #btnS { grid-area: s; border-radius: 50%; background: var(--red); border-color: var(--red); color: #fff;
+          box-shadow: 0 8px 20px rgba(239, 68, 68, 0.3); }
+  #btnS svg { color: #fff; }
+  #btnS:hover:not(:disabled) { background: #dc2626; }
+  #btnS:disabled { background: #fde2e2; border-color: #fde2e2; color: #fff; box-shadow: none; }
+  .keys {
+    margin-top: 18px; display: flex; justify-content: center; flex-wrap: wrap;
+    gap: 6px 12px; font-size: 12px; color: var(--muted);
+  }
+  kbd {
+    display: inline-block; min-width: 22px; padding: 1px 6px; margin-right: 3px;
+    border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px;
+    background: #fff; color: var(--text); font: 600 11px Consolas, monospace; text-align: center;
+  }
+
+  /* ---------- 로그 ---------- */
+  .logbox { padding: 18px; }
+  .log-head { display: flex; justify-content: space-between; align-items: center; }
+  .log-head h2 { margin: 0; font-size: 15px; font-weight: 700; }
+  .ghost {
+    border: 1px solid var(--line); background: #fff; color: var(--muted); border-radius: 8px;
+    padding: 5px 11px; cursor: pointer; font: inherit; font-size: 12px; font-weight: 600;
+  }
+  .ghost:hover { color: var(--blue); border-color: var(--hover-line); }
+  #log {
+    height: 150px; overflow-y: auto; margin: 12px 0 0; padding: 12px 14px;
+    border-radius: 12px; background: var(--soft); color: #334155;
+    font: 12px/1.7 Consolas, monospace; white-space: pre-wrap;
+  }
+  #log:empty::before { content: "연결하면 송수신 내용이 여기에 표시됩니다."; color: #94a3b8; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11"/><rect x="3" y="11" width="18" height="6" rx="2"/><circle cx="7.5" cy="14" r="1" fill="#fde68a" stroke="none"/><circle cx="16.5" cy="14" r="1" fill="#fde68a" stroke="none"/><path d="M6 17v2M18 17v2"/>
+        </svg>
+      </div>
+      <div>
+        <h1>로보카 컨트롤</h1>
+        <p>ROBOCAR · ESP32</p>
+      </div>
+    </div>
+    <div class="pills">
+      <div class="pill" id="pillSerial"><i></i>USB</div>
+      <div class="pill" id="pillWifi"><i></i>Wi-Fi</div>
+    </div>
+  </header>
+
+  <!-- 연결: 시리얼 / Wi-Fi 가로 배치 -->
+  <section class="card connbar">
+    <div class="conn">
+      <span class="conn-label">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v14"/><path d="M8 6l4-4 4 4"/><circle cx="12" cy="19" r="3"/><path d="M6 10v2a2 2 0 0 0 2 2h4M18 8v4a2 2 0 0 1-2 2h-4"/></svg>
+        시리얼
+      </span>
+      <div class="conn-ctrl">
+        <select id="baud" title="통신 속도">
+          <option value="9600">9600</option>
+          <option value="115200" selected>115200</option>
+        </select>
+        <button id="connectBtn" class="btn">시리얼 연결</button>
+      </div>
+      <div class="status">상태 · <b id="status">연결 안 됨</b></div>
+    </div>
+
+    <div class="conn">
+      <span class="conn-label">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a15 15 0 0 1 20 0"/><path d="M5.5 12.5a10 10 0 0 1 13 0"/><path d="M9 16a5 5 0 0 1 6 0"/><circle cx="12" cy="19.5" r="1" fill="currentColor"/></svg>
+        Wi-Fi
+      </span>
+      <div class="conn-ctrl">
+        <input id="ipInput" type="text" inputmode="decimal" placeholder="192.168.4.1" autocomplete="off" spellcheck="false">
+        <button id="wifiBtn" class="btn">Wi-Fi 연결</button>
+      </div>
+      <div class="status">상태 · <b id="wifiStatus">연결 안 됨</b></div>
+    </div>
+  </section>
+
+  <div class="main">
+    <section class="card stage" id="stage" data-m="S">
+      <span class="readout" id="readout">대기 중</span>
+      <div class="car-wrap">
+        <svg class="car" viewBox="0 -60 200 290" aria-label="로보카">
+          <defs>
+            <linearGradient id="bodyG" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#a78bfa"/>
+              <stop offset="1" stop-color="#22d3ee"/>
+            </linearGradient>
+            <linearGradient id="beamG" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0" stop-color="#a78bfa" stop-opacity="0.45"/>
+              <stop offset="1" stop-color="#a78bfa" stop-opacity="0"/>
+            </linearGradient>
+            <filter id="glow" x="-100%" y="-100%" width="300%" height="300%">
+              <feGaussianBlur stdDeviation="2.5" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+            <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+              <feDropShadow dx="0" dy="10" stdDeviation="9" flood-color="#5b21b6" flood-opacity="0.25"/>
+            </filter>
+          </defs>
+
+          <!-- 헤드라이트 빛 -->
+          <path class="beam" d="M58 26 L22 -60 L92 -60 Z" fill="url(#beamG)"/>
+          <path class="beam" d="M142 26 L108 -60 L178 -60 Z" fill="url(#beamG)"/>
+
+          <g filter="url(#shadow)">
+            <!-- 바퀴 (JS로 생성) -->
+            <g id="wheels"></g>
+
+            <!-- 차체 -->
+            <rect x="48" y="16" width="104" height="200" rx="24" fill="url(#bodyG)"/>
+            <rect x="48" y="16" width="104" height="200" rx="24" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+            <rect x="58" y="56" width="84" height="136" rx="12" fill="#0f172a" opacity="0.92"/>
+
+            <!-- 초음파 센서 (눈) -->
+            <rect x="64" y="6" width="72" height="24" rx="8" fill="#2e1065"/>
+            <circle cx="83" cy="18" r="9" fill="#e2e8f0" stroke="#475569" stroke-width="3"/>
+            <circle cx="117" cy="18" r="9" fill="#e2e8f0" stroke="#475569" stroke-width="3"/>
+            <circle cx="83" cy="18" r="3.5" fill="#1e293b"/>
+            <circle cx="117" cy="18" r="3.5" fill="#1e293b"/>
+
+            <!-- 헤드라이트 / 후미등 -->
+            <circle class="head" cx="58" cy="28" r="5"/>
+            <circle class="head" cx="142" cy="28" r="5"/>
+            <rect class="tail" x="60" y="206" width="22" height="6" rx="3"/>
+            <rect class="tail" x="118" y="206" width="22" height="6" rx="3"/>
+
+            <!-- ESP32 보드 -->
+            <rect x="70" y="70" width="60" height="96" rx="5" fill="#111827" stroke="#334155"/>
+            <path d="M76 78 h8 v6 h8 v-6 h8 v6 h8 v-6 h8" fill="none" stroke="#fbbf24" stroke-width="1.6"/>
+            <rect x="80" y="92" width="40" height="34" rx="3" fill="#cbd5e1"/>
+            <rect x="84" y="96" width="32" height="26" rx="2" fill="#94a3b8"/>
+            <text x="100" y="113" text-anchor="middle" font-family="Consolas, monospace" font-size="8" font-weight="700" fill="#334155">ESP32</text>
+            <g fill="#64748b">
+              <rect x="72" y="134" width="3" height="3"/><rect x="72" y="140" width="3" height="3"/><rect x="72" y="146" width="3" height="3"/><rect x="72" y="152" width="3" height="3"/>
+              <rect x="125" y="134" width="3" height="3"/><rect x="125" y="140" width="3" height="3"/><rect x="125" y="146" width="3" height="3"/><rect x="125" y="152" width="3" height="3"/>
+            </g>
+            <rect x="90" y="154" width="20" height="9" rx="2" fill="#475569"/>
+            <circle class="led" cx="120" cy="136" r="2.6"/>
+
+            <!-- 배터리 -->
+            <rect x="74" y="172" width="52" height="14" rx="4" fill="#1e293b" stroke="#334155"/>
+            <rect x="77" y="175" width="30" height="8" rx="2" fill="#34d399"/>
+          </g>
+        </svg>
+      </div>
+    </section>
+
+    <section class="card control">
+      <h2>조작</h2>
+      <div class="pad">
+        <button id="btnF" data-cmd="F" disabled>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4l8 9h-5v7H9v-7H4z"/></svg>전진
+        </button>
+        <button id="btnL" data-cmd="L" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6L4 11l5 5"/><path d="M4 11h9a6 6 0 0 1 6 6v2"/></svg>좌회전
+        </button>
+        <button id="btnS" data-cmd="S" disabled>
+          <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>정지
+        </button>
+        <button id="btnR" data-cmd="R" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l5 5-5 5"/><path d="M20 11h-9a6 6 0 0 0-6 6v2"/></svg>우회전
+        </button>
+        <button id="btnB" data-cmd="B" disabled>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 20l8-9h-5V4H9v7H4z"/></svg>후진
+        </button>
+      </div>
+      <div class="keys">
+        <span><kbd>↑</kbd>전진</span><span><kbd>↓</kbd>후진</span>
+        <span><kbd>←</kbd>좌회전</span><span><kbd>→</kbd>우회전</span><span><kbd>Space</kbd>정지</span>
+      </div>
+    </section>
+  </div>
+
+  <section class="card logbox">
+    <div class="log-head">
+      <h2>통신 로그</h2>
+      <button id="clearLog" class="ghost">지우기</button>
+    </div>
+    <pre id="log"></pre>
+  </section>
+</div>
+
+<script>
+  const NAMES = { F: "전진", B: "후진", L: "좌회전", R: "우회전", S: "정지" };
+  const KEYS = { ArrowUp: "F", ArrowDown: "B", ArrowLeft: "L", ArrowRight: "R", " ": "S" };
+
+  const connectBtn = document.getElementById("connectBtn");
+  const statusEl = document.getElementById("status");
+  const wifiBtn = document.getElementById("wifiBtn");
+  const wifiStatusEl = document.getElementById("wifiStatus");
+  const ipInput = document.getElementById("ipInput");
+  const logEl = document.getElementById("log");
+  const padButtons = document.querySelectorAll(".pad button");
+  const stage = document.getElementById("stage");
+  const readout = document.getElementById("readout");
+
+  // ---- 로보카 바퀴 그리기 ----
+  (function drawWheels() {
+    const NS = "http://www.w3.org/2000/svg";
+    const g = document.getElementById("wheels");
+    const make = (tag, attrs) => {
+      const el = document.createElementNS(NS, tag);
+      Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+      return el;
+    };
+    const wheels = [
+      { x: 24, y: 34, side: "left" }, { x: 24, y: 148, side: "left" },
+      { x: 152, y: 34, side: "right" }, { x: 152, y: 148, side: "right" },
+    ];
+    const W = 24, H = 54;
+    wheels.forEach((w, i) => {
+      const clip = make("clipPath", { id: "wc" + i });
+      clip.appendChild(make("rect", { x: w.x, y: w.y, width: W, height: H, rx: 7 }));
+      g.appendChild(clip);
+
+      const wg = make("g", { "clip-path": `url(#wc${i})` });
+      wg.appendChild(make("rect", { x: w.x, y: w.y, width: W, height: H, fill: "#1f2937" }));
+      const tread = make("g", { class: "tread " + w.side });
+      for (let y = w.y - 8; y < w.y + H + 16; y += 8) {
+        tread.appendChild(make("rect", { x: w.x, y, width: W, height: 3.5, fill: "#4b5563" }));
+      }
+      wg.appendChild(tread);
+      g.appendChild(wg);
+      g.appendChild(make("rect", { x: w.x, y: w.y, width: W, height: H, rx: 7, fill: "none", stroke: "#6b7280", "stroke-width": 1.5 }));
+    });
+  })();
+
+  // ---- 공통 ----
+  function log(msg) {
+    const t = new Date().toLocaleTimeString("ko-KR", { hour12: false });
+    logEl.textContent += `[${t}] ${msg}\n`;
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function isLive() { return !!writer || !!wifiBase; }
+
+  function setMotion(cmd) {
+    stage.dataset.m = cmd;
+    stage.classList.toggle("live", isLive());
+    readout.textContent = isLive() ? NAMES[cmd] : "대기 중";
+    padButtons.forEach(b => b.classList.toggle("active", b.dataset.cmd === cmd && cmd !== "S"));
+  }
+
+  function updatePad() {
+    padButtons.forEach(b => b.disabled = !isLive());
+    if (!isLive()) setMotion("S");
+    else { stage.classList.add("live"); readout.textContent = NAMES[stage.dataset.m]; }
+  }
+
+  async function send(cmd) {
+    if (!isLive()) return;
+    setMotion(cmd);
+    const jobs = [];
+    if (writer) jobs.push(sendSerial(cmd));
+    if (wifiBase) jobs.push(sendWifi(cmd));
+    await Promise.all(jobs);
+  }
+
+  // ---- 시리얼 ----
+  let port = null, writer = null, reader = null;
+  const encoder = new TextEncoder();
+
+  function setSerialConnected(on) {
+    statusEl.textContent = on ? "연결됨" : "연결 안 됨";
+    statusEl.className = on ? "on" : "";
+    connectBtn.textContent = on ? "연결 해제" : "시리얼 연결";
+    connectBtn.classList.toggle("connected", on);
+    document.getElementById("pillSerial").classList.toggle("on", on);
+    document.getElementById("baud").disabled = on;
+    updatePad();
+  }
+
+  async function serialConnect() {
+    if (!("serial" in navigator)) {
+      alert("이 브라우저는 Web Serial을 지원하지 않습니다.\nChrome 또는 Edge에서 열어주세요.");
+      return;
+    }
+    try {
+      port = await navigator.serial.requestPort();
+      await port.open({ baudRate: Number(document.getElementById("baud").value) });
+      writer = port.writable.getWriter();
+      setSerialConnected(true);
+      log("[시리얼] 연결 성공");
+      readLoop();
+    } catch (e) {
+      log("[시리얼] 연결 실패: " + e.message);
+      port = null;
+    }
+  }
+
+  async function serialDisconnect() {
+    try {
+      if (writer) { await sendSerial("S"); writer.releaseLock(); writer = null; }
+      if (reader) { await reader.cancel(); }
+      if (port) { await port.close(); }
+    } catch (e) { log("[시리얼] 해제 오류: " + e.message); }
+    port = null; reader = null; writer = null;
+    setSerialConnected(false);
+    log("[시리얼] 연결 해제");
+  }
+
+  async function readLoop() {
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (port && port.readable) {
+      reader = port.readable.getReader();
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          let i;
+          while ((i = buf.indexOf("\n")) >= 0) {
+            const line = buf.slice(0, i).trim();
+            buf = buf.slice(i + 1);
+            if (line) log("[시리얼] ← " + line);
+          }
+        }
+      } catch (e) {
+        log("[시리얼] 수신 오류: " + e.message);
+        break;
+      } finally {
+        reader.releaseLock();
+      }
+    }
+  }
+
+  async function sendSerial(cmd) {
+    try {
+      await writer.write(encoder.encode(cmd));
+      log(`[시리얼] → ${cmd} (${NAMES[cmd]})`);
+    } catch (e) {
+      log("[시리얼] 전송 실패: " + e.message);
+    }
+  }
+
+  // ---- Wi-Fi (HTTP GET http://IP/cmd?c=F) ----
+  let wifiBase = null;
+
+  function setWifiConnected(on) {
+    wifiStatusEl.textContent = on ? `연결됨 · ${wifiBase.replace("http://", "")}` : "연결 안 됨";
+    wifiStatusEl.className = on ? "on" : "";
+    wifiBtn.textContent = on ? "연결 해제" : "Wi-Fi 연결";
+    wifiBtn.classList.toggle("connected", on);
+    document.getElementById("pillWifi").classList.toggle("on", on);
+    ipInput.disabled = on;
+    updatePad();
+  }
+
+  // 응답 본문은 읽지 않고(no-cors) 도달 여부만 확인 → ESP32에 CORS 설정 불필요
+  async function httpGet(url, timeoutMs = 3000) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      await fetch(url, { mode: "no-cors", cache: "no-store", signal: ctrl.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async function wifiConnect() {
+    const ip = ipInput.value.trim().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+    if (!ip) { alert("ESP32의 IP 주소를 입력하세요."); ipInput.focus(); return; }
+    const base = "http://" + ip;
+    wifiBtn.disabled = true;
+    wifiBtn.textContent = "연결 중...";
+    log(`[Wi-Fi] ${ip} 연결 시도`);
+    try {
+      await httpGet(base + "/ping");
+      wifiBase = base;
+      try { localStorage.setItem("robocar_ip", ip); } catch (e) {}
+      setWifiConnected(true);
+      log("[Wi-Fi] 연결 성공");
+    } catch (e) {
+      log("[Wi-Fi] 연결 실패: " + (e.name === "AbortError" ? "응답 없음 (시간 초과)" : e.message));
+      setWifiConnected(false);
+    } finally {
+      wifiBtn.disabled = false;
+    }
+  }
+
+  async function wifiDisconnect() {
+    await sendWifi("S");
+    wifiBase = null;
+    setWifiConnected(false);
+    log("[Wi-Fi] 연결 해제");
+  }
+
+  async function sendWifi(cmd) {
+    try {
+      await httpGet(`${wifiBase}/cmd?c=${cmd}`);
+      log(`[Wi-Fi] → ${cmd} (${NAMES[cmd]})`);
+    } catch (e) {
+      log(`[Wi-Fi] 전송 실패 (${cmd}): ` + (e.name === "AbortError" ? "응답 없음" : e.message));
+    }
+  }
+
+  // ---- 이벤트 ----
+  connectBtn.addEventListener("click", () => port ? serialDisconnect() : serialConnect());
+  wifiBtn.addEventListener("click", () => wifiBase ? wifiDisconnect() : wifiConnect());
+  ipInput.addEventListener("keydown", e => { if (e.key === "Enter" && !wifiBase) wifiConnect(); });
+  padButtons.forEach(b => b.addEventListener("click", () => send(b.dataset.cmd)));
+  document.getElementById("clearLog").addEventListener("click", () => logEl.textContent = "");
+
+  document.addEventListener("keydown", e => {
+    if (e.target === ipInput) return;
+    const cmd = KEYS[e.key];
+    if (!cmd || !isLive() || e.repeat) return;
+    e.preventDefault();
+    send(cmd);
+  });
+
+  if ("serial" in navigator) {
+    navigator.serial.addEventListener("disconnect", e => {
+      if (e.target === port) {
+        log("[시리얼] 장치가 분리되었습니다");
+        port = null; writer = null; reader = null;
+        setSerialConnected(false);
+      }
+    });
+  }
+
+  try { ipInput.value = localStorage.getItem("robocar_ip") || ""; } catch (e) {}
+</script>
+</body>
+</html>
